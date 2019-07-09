@@ -56,6 +56,7 @@ type colorHandler struct{}
 func (h *colorHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	color, err := getColorFromColorTeller(request)
 	if err != nil {
+		log.Printf("Error fetching color, err:%s", err)
 		writer.WriteHeader(http.StatusInternalServerError)
 		writer.Write([]byte("500 - Unexpected Error"))
 		return
