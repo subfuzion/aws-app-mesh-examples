@@ -1,0 +1,14 @@
+# Environment variables needed for the demo
+# 1. Save a copy of this file and name it `config` (it will be ignored by git)
+# 2. Update as appropriate
+# 3. Load `config` into your shell environment: $ source config
+
+# AWS region to launch resources in
+export AWS_DEFAULT_REGION=us-west-1
+
+# prefix to use for identify resources created by CloudFormation for the demo
+export RESOURCE_PREFIX=demo
+
+# override current AWS CLI profile (this can also be left unset or set to "default")
+export AWS_DEFAULT_PROFILE=default
+
