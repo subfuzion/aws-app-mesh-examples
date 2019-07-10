@@ -1,9 +1,8 @@
 ---
 Parameters:
-  AppMeshXdsEndpoint:
+  Prefix:
     Type: String
-    Description: App Mesh XDS Endpoint Override (normally don't set this)
-    Default: ""
+    Description: Prefix name that joins all the stacks
 
 Resources:
   Cluster:
@@ -16,17 +15,17 @@ Resources:
     Properties: 
       GroupDescription: "Security group for the instances"
       VpcId:
-        Fn::ImportValue: !Sub '${AWS::StackName}-vpc:VPC'
+        Fn::ImportValue: !Sub '${Prefix}-vpc:VPC'
       SecurityGroupIngress:
       - CidrIp:
-          Fn::ImportValue: !Sub '${AWS::StackName}-vpc:VpcCIDR'
+          Fn::ImportValue: !Sub '${Prefix}-vpc:VpcCIDR'
         IpProtocol: -1
         
   LogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub '${AWS::StackName}-log-group'
-      RetentionInDays: 30
+      LogGroupName: !Sub '${Prefix}-log-group'
+      RetentionInDays: 5
 
   TaskIamRole:
     Type: AWS::IAM::Role
@@ -62,10 +61,10 @@ Resources:
   CloudMapNamespace:
     Type: AWS::ServiceDiscovery::PrivateDnsNamespace
     Properties:
-      Name: !Sub '${AWS::StackName}-mesh.local'
+      Name: !Sub '${Prefix}-mesh.local'
       Vpc:
         Fn::ImportValue:
-          !Sub "${AWS::StackName}-vpc:VPC"
+          !Sub "${Prefix}-vpc:VPC"
 
   ColorTellerServiceRegistry:
     Type: AWS::ServiceDiscovery::Service
@@ -75,9 +74,9 @@ Resources:
         NamespaceId: !GetAtt 'CloudMapNamespace.Id'
         DnsRecords:
           - Type: A
-            TTL: 300
+            TTL: 10
       HealthCheckCustomConfig:
-        FailureThreshold: 1
+        FailureThreshold: 10
 
   ColorGatewayServiceRegistry:
     Type: AWS::ServiceDiscovery::Service
@@ -87,9 +86,9 @@ Resources:
         NamespaceId: !GetAtt 'CloudMapNamespace.Id'
         DnsRecords:
           - Type: A
-            TTL: 300
+            TTL: 10
       HealthCheckCustomConfig:
-        FailureThreshold: 1
+        FailureThreshold: 10
 
   PublicLoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -97,7 +96,7 @@ Resources:
       GroupDescription: 'Access to the public facing load balancer'
       VpcId:
         Fn::ImportValue:
-          !Sub "${AWS::StackName}-vpc:VPC"
+          !Sub "${Prefix}-vpc:VPC"
       SecurityGroupIngress:
       - CidrIp: 0.0.0.0/0
         IpProtocol: -1
@@ -111,9 +110,9 @@ Resources:
           Value: '30'
       Subnets:
       - Fn::ImportValue:
-          !Sub '${AWS::StackName}-vpc:PublicSubnet1'
+          !Sub '${Prefix}-vpc:PublicSubnet1'
       - Fn::ImportValue:
-          !Sub '${AWS::StackName}-vpc:PublicSubnet2'
+          !Sub '${Prefix}-vpc:PublicSubnet2'
       SecurityGroups:
       - !Ref PublicLoadBalancerSecurityGroup
 
@@ -126,16 +125,16 @@ Resources:
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
       TargetType: ip
-      Name: !Sub '${AWS::StackName}-webtarget'
+      Name: !Sub '${Prefix}-webtarget'
       Port: 80
       Protocol: HTTP
       UnhealthyThresholdCount: 2
       TargetGroupAttributes:
       - Key: deregistration_delay.timeout_seconds
-        Value: 120
+        Value: 30
       VpcId:
         Fn::ImportValue:
-          !Sub "${AWS::StackName}-vpc:VPC"
+          !Sub "${Prefix}-vpc:VPC"
   
   PublicLoadBalancerListener:
     DependsOn:
@@ -169,35 +168,18 @@ Resources:
       - 'FARGATE'
       Family: 'colorgateway'
       NetworkMode: 'awsvpc'
-      Cpu: 256
-      Memory: 512
+      Cpu: 512
+      Memory: 1024
       TaskRoleArn: !Ref TaskIamRole
       ExecutionRoleArn: !Ref TaskExecutionIamRole
-      ProxyConfiguration:
-        Type: 'APPMESH'
-        ContainerName: 'envoy'
-        ProxyConfigurationProperties:
-        - Name: 'IgnoredUID'
-          Value: '1337'
-        - Name: 'ProxyIngressPort'
-          Value: '15000'
-        - Name: 'ProxyEgressPort'
-          Value: '15001'
-        - Name: 'AppPorts'
-          Value: '9080'
-        - Name: 'EgressIgnoredIPs'
-          Value: '169.254.170.2,169.254.169.254'
       ContainerDefinitions:
       - Name: 'app'
         Image: subfuzion/colorgateway:v2
         Essential: true
-        DependsOn:
-        - ContainerName: "envoy"
-          Condition: "HEALTHY"
         LogConfiguration:
           LogDriver: 'awslogs'
           Options:
-            awslogs-group: !Sub '${AWS::StackName}-log-group'
+            awslogs-group: !Sub '${Prefix}-log-group'
             awslogs-region: !Ref AWS::Region
             awslogs-stream-prefix: 'colorgateway'
         PortMappings:
@@ -207,44 +189,11 @@ Resources:
         - Name: "SERVER_PORT"
           Value: "9080"
         - Name: "COLOR_TELLER_ENDPOINT"
-          Value: !Sub "colorteller.${AWS::StackName}-mesh.local:9080"
+          Value: !Sub "colorteller.${Prefix}-mesh.local:9080"
         - Name: "TCP_ECHO_ENDPOINT"
           Value: ""
         - Name: "STAGE"
           Value: ""
-      - Name: envoy
-        Image: subfuzion/aws-appmesh-envoy:v1.9.1.0-prod
-        Essential: true
-        User: '1337'
-        Ulimits:
-        - Name: "nofile"
-          HardLimit: 15000
-          SoftLimit: 15000
-        PortMappings:
-        - ContainerPort: 9901
-          Protocol: 'tcp'
-        - ContainerPort: 15000
-          Protocol: 'tcp'
-        - ContainerPort: 15001
-          Protocol: 'tcp'
-        HealthCheck:
-          Command:
-          - 'CMD-SHELL'
-          - 'curl -s http://localhost:9901/server_info | grep state | grep -q LIVE'
-          Interval: 5
-          Timeout: 2
-          Retries: 3
-        LogConfiguration:
-          LogDriver: 'awslogs'
-          Options:
-            awslogs-group: !Sub '${AWS::StackName}-log-group'
-            awslogs-region: !Ref AWS::Region
-            awslogs-stream-prefix: 'colorgateway'
-        Environment:
-        - Name: 'APPMESH_VIRTUAL_NODE_NAME'
-          Value: !Sub 'mesh/${AWS::StackName}-mesh/virtualNode/colorgateway-node'
-        - Name: 'ENVOY_LOG_LEVEL'
-          Value: 'debug'
 
   BlueColorTellerTaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -253,35 +202,18 @@ Resources:
       - 'FARGATE'
       Family: 'blue'
       NetworkMode: 'awsvpc'
-      Cpu: 256
-      Memory: 512
+      Cpu: 512
+      Memory: 1024
       TaskRoleArn: !Ref TaskIamRole
       ExecutionRoleArn: !Ref TaskExecutionIamRole
-      ProxyConfiguration:
-        Type: 'APPMESH'
-        ContainerName: 'envoy'
-        ProxyConfigurationProperties:
-        - Name: 'IgnoredUID'
-          Value: '1337'
-        - Name: 'ProxyIngressPort'
-          Value: '15000'
-        - Name: 'ProxyEgressPort'
-          Value: '15001'
-        - Name: 'AppPorts'
-          Value: '9080'
-        - Name: 'EgressIgnoredIPs'
-          Value: '169.254.170.2,169.254.169.254'
       ContainerDefinitions:
       - Name: 'app'
         Image: subfuzion/colorteller
         Essential: true
-        DependsOn:
-        - ContainerName: "envoy"
-          Condition: "HEALTHY"
         LogConfiguration:
           LogDriver: 'awslogs'
           Options:
-            awslogs-group: !Sub ${AWS::StackName}-log-group
+            awslogs-group: !Sub ${Prefix}-log-group
             awslogs-region: !Ref AWS::Region
             awslogs-stream-prefix: 'blue'
         PortMappings:
@@ -294,121 +226,6 @@ Resources:
           Value: "9080"
         - Name: "STAGE"
           Value: ""
-      - Name: envoy
-        Image: subfuzion/aws-appmesh-envoy:v1.9.1.0-prod
-        Essential: true
-        User: '1337'
-        Ulimits:
-        - Name: "nofile"
-          HardLimit: 15000
-          SoftLimit: 15000
-        PortMappings:
-        - ContainerPort: 9901
-          Protocol: 'tcp'
-        - ContainerPort: 15000
-          Protocol: 'tcp'
-        - ContainerPort: 15001
-          Protocol: 'tcp'
-        HealthCheck:
-          Command:
-          - 'CMD-SHELL'
-          - 'curl -s http://localhost:9901/server_info | grep state | grep -q LIVE'
-          Interval: 5
-          Timeout: 2
-          Retries: 3
-        LogConfiguration:
-          LogDriver: 'awslogs'
-          Options:
-            awslogs-group: !Sub '${AWS::StackName}-log-group'
-            awslogs-region: !Ref AWS::Region
-            awslogs-stream-prefix: 'blue'
-        Environment:
-        - Name: 'APPMESH_VIRTUAL_NODE_NAME'
-          Value: !Sub 'mesh/${AWS::StackName}-mesh/virtualNode/colorteller-blue-node'
-        - Name: 'ENVOY_LOG_LEVEL'
-          Value: 'debug'
-
-  GreenColorTellerTaskDefinition:
-    Type: AWS::ECS::TaskDefinition
-    Properties:
-      RequiresCompatibilities:
-      - 'FARGATE'
-      Family: 'green'
-      NetworkMode: 'awsvpc'
-      Cpu: 256
-      Memory: 512
-      TaskRoleArn: !Ref TaskIamRole
-      ExecutionRoleArn: !Ref TaskExecutionIamRole
-      ProxyConfiguration:
-        Type: 'APPMESH'
-        ContainerName: 'envoy'
-        ProxyConfigurationProperties:
-        - Name: 'IgnoredUID'
-          Value: '1337'
-        - Name: 'ProxyIngressPort'
-          Value: '15000'
-        - Name: 'ProxyEgressPort'
-          Value: '15001'
-        - Name: 'AppPorts'
-          Value: '9080'
-        - Name: 'EgressIgnoredIPs'
-          Value: '169.254.170.2,169.254.169.254'
-      ContainerDefinitions:
-      - Name: 'app'
-        Image: subfuzion/colorteller
-        Essential: true
-        DependsOn:
-        - ContainerName: "envoy"
-          Condition: "HEALTHY"
-        LogConfiguration:
-          LogDriver: 'awslogs'
-          Options:
-            awslogs-group: !Sub '${AWS::StackName}-log-group'
-            awslogs-region: !Ref AWS::Region
-            awslogs-stream-prefix: 'green'
-        PortMappings:
-        - ContainerPort: 9080
-          Protocol: 'tcp'
-        Environment:
-        - Name: "COLOR"
-          Value: "green"
-        - Name: "SERVER_PORT"
-          Value: "9080"
-        - Name: "STAGE"
-          Value: ""
-      - Name: envoy
-        Image: subfuzion/aws-appmesh-envoy:v1.9.1.0-prod
-        Essential: true
-        User: '1337'
-        Ulimits:
-        - Name: "nofile"
-          HardLimit: 15000
-          SoftLimit: 15000
-        PortMappings:
-        - ContainerPort: 9901
-          Protocol: 'tcp'
-        - ContainerPort: 15000
-          Protocol: 'tcp'
-        - ContainerPort: 15001
-          Protocol: 'tcp'
-        HealthCheck:
-          Command:
-          - 'CMD-SHELL'
-          - 'curl -s http://localhost:9901/server_info | grep state | grep -q LIVE'
-          Interval: 5
-          Timeout: 2
-          Retries: 3
-        LogConfiguration:
-          LogDriver: 'awslogs'
-          Options:
-            awslogs-group: !Sub '${AWS::StackName}-log-group'
-            awslogs-region: !Ref AWS::Region
-            awslogs-stream-prefix: 'green'
-        Environment:
-        - Name: 'APPMESH_VIRTUAL_NODE_NAME'
-          Value: !Sub 'mesh/${AWS::StackName}-mesh/virtualNode/colorteller-green-node'
-        - Name: 'ENVOY_LOG_LEVEL'
-          Value: 'debug'
 
   ColorGatewayService:
     Type: AWS::ECS::Service
@@ -430,9 +247,9 @@ Resources:
           - !Ref SecurityGroup
           Subnets: 
           - Fn::ImportValue:
-              !Sub '${AWS::StackName}-vpc:PrivateSubnet1'
+              !Sub '${Prefix}-vpc:PrivateSubnet1'
           - Fn::ImportValue:
-              !Sub '${AWS::StackName}-vpc:PrivateSubnet2'
+              !Sub '${Prefix}-vpc:PrivateSubnet2'
       TaskDefinition: !Ref ColorGatewayTaskDefinition
       LoadBalancers:
       - ContainerName: app
@@ -457,37 +274,44 @@ Resources:
           - !Ref SecurityGroup
           Subnets: 
           - Fn::ImportValue:
-              !Sub '${AWS::StackName}-vpc:PrivateSubnet1'
+              !Sub '${Prefix}-vpc:PrivateSubnet1'
           - Fn::ImportValue:
-              !Sub '${AWS::StackName}-vpc:PrivateSubnet2'
+              !Sub '${Prefix}-vpc:PrivateSubnet2'
       TaskDefinition: !Ref BlueColorTellerTaskDefinition
-
-  GreenColorTellerService:
-    Type: AWS::ECS::Service
-    Properties:
-      Cluster: !Ref Cluster
-      DeploymentConfiguration:
-        MaximumPercent: 200
-        MinimumHealthyPercent: 100
-      DesiredCount: 1
-      LaunchType: 'FARGATE'
-      ServiceRegistries:
-      - RegistryArn: !GetAtt 'ColorTellerServiceRegistry.Arn'
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: DISABLED
-          SecurityGroups:
-          - !Ref SecurityGroup
-          Subnets: 
-          - Fn::ImportValue:
-              !Sub '${AWS::StackName}-vpc:PrivateSubnet1'
-          - Fn::ImportValue:
-              !Sub '${AWS::StackName}-vpc:PrivateSubnet2'
-      TaskDefinition: !Ref GreenColorTellerTaskDefinition
 
 Outputs:
   ColorGatewayEndpoint:
     Description: 'Public endpoint for Color Gateway service'
     Value: !Join ['', ['http://', !GetAtt 'PublicLoadBalancer.DNSName']]
     Export:
-      Name: !Sub '${AWS::StackName}:ColorGatewayEndpoint'
+      Name: !Sub '${Prefix}:ColorGatewayEndpoint'
+
+  TaskExecutionIamRole:
+    Description: 'TaskExecutionIamRole'
+    Value: !Ref TaskExecutionIamRole
+    Export:
+      Name: !Sub '${Prefix}:TaskExecutionIamRole'
+
+  TaskIamRole:
+    Description: 'TaskIamRole'
+    Value: !Ref TaskIamRole
+    Export:
+      Name: !Sub '${Prefix}:TaskIamRole'
+
+  ColorTellerServiceRegistryArn:
+    Description: 'ColorTellerServiceRegistryArn'
+    Value: !GetAtt ColorTellerServiceRegistry.Arn
+    Export:
+      Name: !Sub '${Prefix}:ColorTellerServiceRegistryArn'
+
+  Cluster:
+    Description: 'Cluster'
+    Value: !Ref Cluster
+    Export:
+      Name: !Sub '${Prefix}:Cluster'
+
+  SecurityGroup:
+    Description: 'SecurityGroup'
+    Value: !Ref SecurityGroup
+    Export:
+      Name: !Sub '${Prefix}:SecurityGroup'
