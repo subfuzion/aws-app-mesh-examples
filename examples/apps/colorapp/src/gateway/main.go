@@ -56,7 +56,7 @@ type colorHandler struct{}
 func (h *colorHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	color, err := getColorFromColorTeller(request)
 	if err != nil {
-		log.Printf("Error fetching color, err:%s", err)
+		log.Printf("Error fetching color, err: %s", err)
 		writer.WriteHeader(http.StatusInternalServerError)
 		writer.Write([]byte("500 - Unexpected Error"))
 		return
@@ -68,10 +68,10 @@ func (h *colorHandler) ServeHTTP(writer http.ResponseWriter, request *http.Reque
 	addColor(color)
 	statsJson, err := json.Marshal(getRatios())
 	if err != nil {
-		fmt.Fprintf(writer, `{"color":"%s", "error":"%s"}`, color, err)
+		fmt.Fprintf(writer, `{"color": "%s", "error": "%s"}`, color, err)
 		return
 	}
-	fmt.Fprintf(writer, `{"color":"%s", "stats": %s}`, color, statsJson)
+	fmt.Fprintf(writer, `{"color": "%s", "stats": %s}`, color, statsJson)
 }
 
 func addColor(color string) {
