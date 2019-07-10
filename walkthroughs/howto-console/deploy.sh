@@ -1,114 +1,145 @@
 #!/usr/bin/env bash
 set -e
 
-DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
-SCRIPT="$( basename "$0" )"
+DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null && pwd)
+SCRIPT="$(basename "$0")"
 
 usage() {
-    echo "Usage: $SCRIPT app|mesh"
+  echo "Usage: $SCRIPT app|mesh"
+
+}
+
+info () {
+  echo "Environment:"
+  echo "AWS_DEFAULT_REGION  = ${AWS_DEFAULT_REGION}"
+  echo "AWS_DEFAULT_PROFILE = ${AWS_DEFAULT_PROFILE}"
+  echo "RESOURCE_PREFIX     = ${RESOURCE_PREFIX}"
+  echo
+}
+
+deploy_stack() {
+  [[ -z $1 ]] && echo "deploy_stack: missing stack name" && exit 1
+
+  local stack="$1"
+  local stackname="${RESOURCE_PREFIX}-${stack}"
+  local template="${DIR}/${stack}.yaml"
+
+  echo "deploy ${stackname} (${stack}.yaml) ..."
+
+  aws --region "${AWS_DEFAULT_REGION}" \
+    cloudformation deploy \
+    --no-fail-on-empty-changeset \
+    --stack-name "$stackname" \
+    --template-file "${template}" \
+    --capabilities CAPABILITY_IAM \
+    --parameter-overrides \
+    Prefix="${RESOURCE_PREFIX}"
+
+  echo
+}
+
+delete_stack() {
+  [[ -z $1 ]] && echo "delete_stack: missing stack name" && exit 1
+  local stack="$1"
+  local stackname="${RESOURCE_PREFIX}-${stack}"
+
+  echo "delete stack: ${stackname} ..."
+  aws --region "${AWS_DEFAULT_REGION}" \
+    cloudformation delete-stack \
+    --stack-name "${stackname}"
+
+  aws --region "${AWS_DEFAULT_REGION}" \
+    cloudformation wait stack-delete-complete \
+    --stack-name "${stackname}"
+
+  echo
 }
 
 deploy_vpc() {
-    aws --region "${AWS_DEFAULT_REGION}" \
-        cloudformation deploy \
-        --no-fail-on-empty-changeset \
-        --stack-name "${RESOURCE_PREFIX}-vpc" \
-        --template-file "${DIR}/vpc.yaml" \
-        --capabilities CAPABILITY_IAM
+  deploy_stack "vpc"
 }
 
-deploy_mesh() {
-    aws --region "${AWS_DEFAULT_REGION}" \
-        cloudformation deploy \
-        --no-fail-on-empty-changeset \
-        --stack-name "${RESOURCE_PREFIX}-mesh" \
-        --template-file "${DIR}/mesh.yaml" \
-        --capabilities CAPABILITY_IAM
+deploy_cluster() {
+  deploy_stack "cluster"
 }
 
-deploy_app() {
-    local stackname="$1"
-    local template="$2"
-
-    aws --region "${AWS_DEFAULT_REGION}" \
-        cloudformation deploy \
-        --no-fail-on-empty-changeset \
-        --stack-name "$stackname" \
-        --template-file "${template}" \
-        --capabilities CAPABILITY_IAM \
-        --parameter-overrides \
-          Prefix="${RESOURCE_PREFIX}"
-}
-
-confirm_service_linked_role() {
-    if ! aws iam get-role --role-name AWSServiceRoleForAppMesh >/dev/null
-    then
-        echo "Error: no service linked role for App Mesh"
-        exit 1
-    fi
-}
-
-print_endpoint() {
-    local stackname=$1
-
-    echo
-    echo "Endpoints:"
-    echo "=========="
-    local url=$(aws cloudformation describe-stacks \
-      --stack-name="${stackname}" \
-      --query="Stacks[0].Outputs[?OutputKey=='ColorGatewayEndpoint'].OutputValue" \
-      --output=text)
-    echo "1. get color        :  "${url}"/color"
-    echo "2. clear histogram  :  "${url}"/color/clear"
-    echo
+deploy_gateway() {
+  deploy_stack "gateway"
 }
 
 deploy_blue() {
-    local stackname="$1"
-    local template="${DIR}"/app.yaml
-
-    echo "deploy vpc..."
-    deploy_vpc
-
-    echo "deploy app (blue service)..."
-    deploy_app "${stackname}" "${template}"
-
-    confirm_service_linked_role
-    print_endpoint "${stackname}"
+  deploy_stack "blue"
 }
 
 deploy_green() {
-    local stackname="$1"
-
-    echo "deploy update (green service)..."
-    deploy_app "${stackname}" "${DIR}"/green.yaml
-    print_endpoint "${stackname}"
+  deploy_stack "green"
 }
 
-deploy_both() {
-  deploy_blue "$1"
-  deploy_green "$2"
+deploy_mesh() {
+  deploy_stack "mesh"
 }
 
-deploy_mesh_only() {
-    echo "deploy mesh..."
-    deploy_mesh
+confirm_service_linked_role() {
+  if ! aws iam get-role --role-name AWSServiceRoleForAppMesh >/dev/null; then
+    echo "Error: no service linked role for App Mesh"
+    exit 1
+  fi
+}
+
+print_endpoints() {
+  local stackname="${RESOURCE_PREFIX}-$1"
+
+  echo
+  echo "Endpoints:"
+  echo "=========="
+  local url=$(aws cloudformation describe-stacks \
+    --stack-name="${stackname}" \
+    --query="Stacks[0].Outputs[?OutputKey=='PublicURL'].OutputValue" \
+    --output=text)
+  echo "1. get color        :  "${url}"/color"
+  echo "2. clear histogram  :  "${url}"/color/clear"
+  echo
+}
+
+deploy_app() {
+  deploy_vpc
+  deploy_cluster
+  deploy_gateway
+  deploy_blue
+
+  confirm_service_linked_role
+  print_endpoints "cluster"
+}
+
+delete_all() {
+  delete_stack "green"
+  delete_stack "blue"
+  delete_stack "gateway"
+  delete_stack "cluster"
+  delete_stack "vpc"
 }
 
 main() {
-    local arg=$1
-    local bluestack="${RESOURCE_PREFIX}"-app
-    local greenstack="${RESOURCE_PREFIX}"-green
+  local arg=$1
 
-    case $arg in
-        app) deploy_blue "${bluestack}" ;;
-        update) deploy_green "${greenstack}" ;;
-        both) deploy_both "${bluestack}" "${greenstack}" ;;
-        mesh) deploy_mesh_only ;;
-        url) print_endpoint "${bluestack}" ;;
-        *) usage; exit 1 ;;
-    esac
+  info
+
+  case $arg in
+  app) deploy_app ;;
+  vpc) deploy_vpc ;;
+  cluster) deploy_cluster ;;
+  gateway) deploy_gateway ;;
+  blue) deploy_blue ;;
+  green) deploy_green ;;
+  mesh) deploy_mesh ;;
+  url) print_endpoints ;;
+  delete-stack) delete_stack $2 ;;
+  delete-all) delete_all ;;
+  *)
+    usage
+    exit 1
+    ;;
+  esac
 }
 
 main "$@"
-

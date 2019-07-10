@@ -5,12 +5,12 @@ Parameters:
     Description: Prefix name that joins all the stacks
 
 Resources:
-  GreenColorTellerTaskDefinition:
+  ColorGatewayTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
       RequiresCompatibilities:
         - 'FARGATE'
-      Family: 'green'
+      Family: 'colorgateway'
       NetworkMode: 'awsvpc'
       Cpu: 512
       Memory: 1024
@@ -22,27 +22,31 @@ Resources:
           !Sub "${Prefix}:TaskExecutionIamRole"
       ContainerDefinitions:
         - Name: 'app'
-          Image: subfuzion/colorteller
+          Image: subfuzion/colorgateway
           Essential: true
           LogConfiguration:
             LogDriver: 'awslogs'
             Options:
-              awslogs-group: !Sub ${Prefix}-log-group
+              awslogs-group: !Sub '${Prefix}-log-group'
               awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: 'green'
+              awslogs-stream-prefix: 'colorgateway'
           PortMappings:
             - ContainerPort: 9080
               Protocol: 'tcp'
           Environment:
             - Name: "SERVER_PORT"
               Value: "9080"
-            - Name: "COLOR"
-              Value: "green"
+            - Name: "COLOR_TELLER_ENDPOINT"
+              Value: !Sub "colorteller.${Prefix}-mesh.local:9080"
+            - Name: "TCP_ECHO_ENDPOINT"
+              Value: ""
             - Name: "STAGE"
               Value: ""
 
-  GreenColorTellerService:
+  ColorGatewayService:
     Type: AWS::ECS::Service
+    #    DependsOn:
+    #      - WebLoadBalancerRule
     Properties:
       Cluster:
         Fn::ImportValue:
@@ -55,7 +59,7 @@ Resources:
       ServiceRegistries:
         - RegistryArn:
             Fn::ImportValue:
-              !Sub "${Prefix}:ColorTellerServiceRegistryArn"
+              !Sub "${Prefix}:ColorGatewayServiceRegistryArn"
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: DISABLED
@@ -67,5 +71,11 @@ Resources:
                 !Sub '${Prefix}-vpc:PrivateSubnet1'
             - Fn::ImportValue:
                 !Sub '${Prefix}-vpc:PrivateSubnet2'
-      TaskDefinition: !Ref GreenColorTellerTaskDefinition
+      TaskDefinition: !Ref ColorGatewayTaskDefinition
+      LoadBalancers:
+        - ContainerName: app
+          ContainerPort: 9080
+          TargetGroupArn:
+            Fn::ImportValue:
+              !Sub "${Prefix}:WebTargetGroup"
 

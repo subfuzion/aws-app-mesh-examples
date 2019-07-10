@@ -5,12 +5,12 @@ Parameters:
     Description: Prefix name that joins all the stacks
 
 Resources:
-  GreenColorTellerTaskDefinition:
+  BlueColorTellerTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
       RequiresCompatibilities:
         - 'FARGATE'
-      Family: 'green'
+      Family: 'blue'
       NetworkMode: 'awsvpc'
       Cpu: 512
       Memory: 1024
@@ -29,7 +29,7 @@ Resources:
             Options:
               awslogs-group: !Sub ${Prefix}-log-group
               awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: 'green'
+              awslogs-stream-prefix: 'blue'
           PortMappings:
             - ContainerPort: 9080
               Protocol: 'tcp'
@@ -37,11 +37,11 @@ Resources:
             - Name: "SERVER_PORT"
               Value: "9080"
             - Name: "COLOR"
-              Value: "green"
+              Value: "blue"
             - Name: "STAGE"
               Value: ""
 
-  GreenColorTellerService:
+  BlueColorTellerService:
     Type: AWS::ECS::Service
     Properties:
       Cluster:
@@ -67,5 +67,5 @@ Resources:
                 !Sub '${Prefix}-vpc:PrivateSubnet1'
             - Fn::ImportValue:
                 !Sub '${Prefix}-vpc:PrivateSubnet2'
-      TaskDefinition: !Ref GreenColorTellerTaskDefinition
+      TaskDefinition: !Ref BlueColorTellerTaskDefinition
 

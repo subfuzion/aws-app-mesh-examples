@@ -1,0 +1,212 @@
+---
+Parameters:
+  Prefix:
+    Type: String
+    Description: Prefix name that joins all the stacks
+
+Resources:
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref AWS::StackName
+      
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: "Security group for the instances"
+      VpcId:
+        Fn::ImportValue: !Sub '${Prefix}-vpc:VPC'
+      SecurityGroupIngress:
+      - CidrIp:
+          Fn::ImportValue: !Sub '${Prefix}-vpc:VpcCIDR'
+        IpProtocol: -1
+        
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '${Prefix}-log-group'
+      RetentionInDays: 5
+
+  TaskIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument: |
+        {
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": { "Service": [ "ecs-tasks.amazonaws.com" ]},
+                "Action": [ "sts:AssumeRole" ]
+            }]
+        }
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/CloudWatchFullAccess
+
+  TaskExecutionIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument: |
+        {
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": { "Service": [ "ecs-tasks.amazonaws.com" ]},
+                "Action": [ "sts:AssumeRole" ]
+            }]
+        }
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+      - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+
+  CloudMapNamespace:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+    Properties:
+      Name: !Sub '${Prefix}-mesh.local'
+      Vpc:
+        Fn::ImportValue:
+          !Sub "${Prefix}-vpc:VPC"
+
+  ColorTellerServiceRegistry:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: 'colorteller'
+      DnsConfig:
+        NamespaceId: !GetAtt 'CloudMapNamespace.Id'
+        DnsRecords:
+          - Type: A
+            TTL: 10
+      HealthCheckCustomConfig:
+        FailureThreshold: 10
+
+  ColorGatewayServiceRegistry:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: 'colorgateway'
+      DnsConfig:
+        NamespaceId: !GetAtt 'CloudMapNamespace.Id'
+        DnsRecords:
+          - Type: A
+            TTL: 10
+      HealthCheckCustomConfig:
+        FailureThreshold: 10
+
+  PublicLoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'Access to the public facing load balancer'
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${Prefix}-vpc:VPC"
+      SecurityGroupIngress:
+      - CidrIp: 0.0.0.0/0
+        IpProtocol: -1
+
+  PublicLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: '30'
+      Subnets:
+      - Fn::ImportValue:
+          !Sub '${Prefix}-vpc:PublicSubnet1'
+      - Fn::ImportValue:
+          !Sub '${Prefix}-vpc:PublicSubnet2'
+      SecurityGroups:
+      - !Ref PublicLoadBalancerSecurityGroup
+
+  WebTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 6
+      HealthCheckPath: '/ping'
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      TargetType: ip
+      Name: !Sub '${Prefix}-webtarget'
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 2
+      TargetGroupAttributes:
+      - Key: deregistration_delay.timeout_seconds
+        Value: 30
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${Prefix}-vpc:VPC"
+  
+  PublicLoadBalancerListener:
+    DependsOn:
+    - PublicLoadBalancer
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+      - TargetGroupArn: !Ref WebTargetGroup
+        Type: 'forward'
+      LoadBalancerArn: !Ref PublicLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  WebLoadBalancerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - TargetGroupArn: !Ref WebTargetGroup
+        Type: 'forward'
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - '*'
+      ListenerArn: !Ref PublicLoadBalancerListener
+      Priority: 1
+
+Outputs:
+  PublicURL:
+    Description: 'Public URL for the Color App'
+    Value: !Join ['', ['http://', !GetAtt 'PublicLoadBalancer.DNSName']]
+    Export:
+      Name: !Sub '${Prefix}:PublicURL'
+
+  Cluster:
+    Description: 'Cluster'
+    Value: !Ref Cluster
+    Export:
+      Name: !Sub '${Prefix}:Cluster'
+
+  SecurityGroup:
+    Description: 'SecurityGroup'
+    Value: !Ref SecurityGroup
+    Export:
+      Name: !Sub '${Prefix}:SecurityGroup'
+
+  TaskExecutionIamRole:
+    Description: 'TaskExecutionIamRole'
+    Value: !Ref TaskExecutionIamRole
+    Export:
+      Name: !Sub '${Prefix}:TaskExecutionIamRole'
+
+  TaskIamRole:
+    Description: 'TaskIamRole'
+    Value: !Ref TaskIamRole
+    Export:
+      Name: !Sub '${Prefix}:TaskIamRole'
+
+  WebTargetGroup:
+    Description: 'WebTargetGroup'
+    Value: !Ref WebTargetGroup
+    Export:
+      Name: !Sub '${Prefix}:WebTargetGroup'
+
+  ColorGatewayServiceRegistryArn:
+    Description: 'ColorGatewayServiceRegistryArn'
+    Value: !GetAtt ColorGatewayServiceRegistry.Arn
+    Export:
+      Name: !Sub '${Prefix}:ColorGatewayServiceRegistryArn'
+
+  ColorTellerServiceRegistryArn:
+    Description: 'ColorTellerServiceRegistryArn'
+    Value: !GetAtt ColorTellerServiceRegistry.Arn
+    Export:
+      Name: !Sub '${Prefix}:ColorTellerServiceRegistryArn'
+
