@@ -18,7 +18,9 @@ Commands:
   mesh           deploy mesh
   delete-stack   [STACK] delete specific stack
   delete-all     delete all stacks
+
 END
+  exit $1
 }
 
 info () {
@@ -29,8 +31,14 @@ info () {
   echo
 }
 
+error() {
+  echo "$@"
+  exit 1
+}
+
 deploy_stack() {
-  [[ -z $1 ]] && echo "deploy_stack: missing stack name" && exit 1
+  [[ -z "$1" ]] && error "deploy_stack: missing stack name"
+  info
 
   local stack="$1"
   local stackname="${RESOURCE_PREFIX}-${stack}"
@@ -51,19 +59,21 @@ deploy_stack() {
 }
 
 delete_stack() {
-  [[ -z $1 ]] && echo "delete_stack: missing stack name" && exit 1
-  local stack="$1"
-  local stackname="${RESOURCE_PREFIX}-${stack}"
+  [[ -z "$1" ]] && error "delete_stack: missing stack name"
+  info
 
-  echo "delete stack: ${stackname} ..."
-  aws --region "${AWS_DEFAULT_REGION}" \
-    cloudformation delete-stack \
-    --stack-name "${stackname}"
+  for stack in "$@"; do
+    local stackname="${RESOURCE_PREFIX}-${stack}"
 
-  aws --region "${AWS_DEFAULT_REGION}" \
-    cloudformation wait stack-delete-complete \
-    --stack-name "${stackname}"
+    echo "delete stack: ${stackname} ..."
+    aws --region "${AWS_DEFAULT_REGION}" \
+      cloudformation delete-stack \
+      --stack-name "${stackname}"
 
+    aws --region "${AWS_DEFAULT_REGION}" \
+      cloudformation wait stack-delete-complete \
+      --stack-name "${stackname}"
+  done
   echo
 }
 
@@ -89,6 +99,10 @@ deploy_green() {
 
 deploy_mesh() {
   deploy_stack "mesh"
+}
+
+deploy_app() {
+  deploy_stack "app"
 }
 
 confirm_service_linked_role() {
@@ -136,26 +150,23 @@ help() {
 }
 
 main() {
+  [[ "$#" == "0" ]] && usage
+
   local arg=$1
-
-  info
-
+  shift
   case $arg in
-  help) help ;;
-  app) deploy_app ;;
-  vpc) deploy_vpc ;;
-  cluster) deploy_cluster ;;
-  gateway) deploy_gateway ;;
-  blue) deploy_blue ;;
-  green) deploy_green ;;
-  mesh) deploy_mesh ;;
-  url) print_endpoints ;;
-  delete-stack) delete_stack $2 ;;
-  delete-all) delete_all ;;
-  *)
-    usage
-    exit 1
-    ;;
+    help) help ;;
+    app) deploy_app ;;
+    vpc) deploy_vpc ;;
+    cluster) deploy_cluster ;;
+    gateway) deploy_gateway ;;
+    blue) deploy_blue ;;
+    green) deploy_green ;;
+    mesh) deploy_mesh ;;
+    url) print_endpoints ;;
+    delete-stack) delete_stack "$@" ;;
+    delete-all) delete_all ;;
+    *) usage 1 ;;
   esac
 }
 

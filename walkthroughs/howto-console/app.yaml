@@ -174,7 +174,7 @@ Resources:
       ExecutionRoleArn: !Ref TaskExecutionIamRole
       ContainerDefinitions:
       - Name: 'app'
-        Image: subfuzion/colorgateway:v2
+        Image: subfuzion/colorgateway:v3
         Essential: true
         LogConfiguration:
           LogDriver: 'awslogs'
