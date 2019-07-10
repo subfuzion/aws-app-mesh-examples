@@ -5,8 +5,20 @@ DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null && pwd)
 SCRIPT="$(basename "$0")"
 
 usage() {
-  echo "Usage: $SCRIPT app|mesh"
-
+cat <<END
+Usage: $SCRIPT <COMMAND> [ARG]
+Commands:
+  help           display this help
+  app            deploy vpc, cluster, gateway, blue
+  vpc            deploy vpc
+  cluster        deploy cluster
+  gateway        deploy gateway service
+  blue           deploy blue service
+  green          deploy green service
+  mesh           deploy mesh
+  delete-stack   [STACK] delete specific stack
+  delete-all     delete all stacks
+END
 }
 
 info () {
@@ -119,12 +131,17 @@ delete_all() {
   delete_stack "vpc"
 }
 
+help() {
+  usage
+}
+
 main() {
   local arg=$1
 
   info
 
   case $arg in
+  help) help ;;
   app) deploy_app ;;
   vpc) deploy_vpc ;;
   cluster) deploy_cluster ;;
