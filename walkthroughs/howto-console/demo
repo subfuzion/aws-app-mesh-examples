@@ -1,0 +1,262 @@
+#!/usr/bin/env bash
+
+# Note: script assumes stack names match file basenames.
+# Ex: "vpc" => "vpc.yaml"
+
+DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null && pwd)
+SCRIPT="$(basename "$0")"
+
+usage() {
+cat <<END
+Usage: $SCRIPT <COMMAND> [ARG]
+Commands:
+  help           display this help
+
+[Demo]
+  app            deploy basic Color App demo (vpc, cluster, gateway, blue)
+  appmesh        deploy Color App demo with App Mesh (vpc, cluster, gateway, blue, green, mesh)
+  url            print the public endpoints for the deployed app
+  color          fetches a color from the deployed app
+  clear          resets the color history for the deployed app
+
+[Infra]
+  vpc            deploy vpc
+  ecs            deploy ecs cluster and public load balancer
+
+[Services]
+  gateway        deploy gateway service
+  blue           deploy blue service
+  green          deploy green service
+
+[Mesh]
+  mesh           deploy mesh
+  meshify        deploy mesh and (re)deploy all services (mesh versions)
+  unmeshify      delete mesh and (re)deploy all services (non-mesh versions)
+
+[Cleanup]
+  delete-stack   [STACKS...] delete specific stack(s)
+  delete-all     delete all stacks
+
+END
+  exit $1
+}
+
+help() {
+  [[ $# -ne 0 ]] && echo "$@" && echo
+  usage
+}
+
+info () {
+  echo "Environment:"
+  echo "AWS_DEFAULT_REGION  = ${AWS_DEFAULT_REGION}"
+  echo "AWS_DEFAULT_PROFILE = ${AWS_DEFAULT_PROFILE}"
+  echo "RESOURCE_PREFIX     = ${RESOURCE_PREFIX}"
+  echo
+}
+
+error() {
+  echo "$@"
+  exit 1
+}
+
+print_endpoints() {
+  local stackname="${RESOURCE_PREFIX}-$1"
+
+  local url=$(aws cloudformation describe-stacks \
+    --stack-name="${stackname}" \
+    --query="Stacks[0].Outputs[?OutputKey=='PublicURL'].OutputValue" \
+    --output=text)
+  echo
+  [[ $? = 0 ]] || help "ERROR (did you forget to deploy the app?)"
+
+  local color_url="${url}/color"
+  local color_clear_url="${url}/color/clear"
+
+  echo "Endpoints:"
+  echo "=========="
+  echo "1. get color        :  ${color_url}"
+  echo "2. clear histogram  :  ${color_clear_url}"
+  echo
+
+  echo "${color_url}" > "${DIR}/color.url"
+  echo "${color_clear_url}" > "${DIR}/color_clear.url"
+  echo "Endpoints saved to files:"
+  echo "${DIR}/color.url"
+  echo "${DIR}/color_clear.url"
+  echo
+}
+
+deploy_stack() {
+  [[ -z "$1" ]] && error "deploy_stack: missing cmd: dir"
+  [[ -z "$2" ]] && error "deploy_stack: missing cmd: name"
+
+  local dir="${DIR}/$1"
+  shift
+
+  for stack in "$@"; do
+    local stackname="${RESOURCE_PREFIX}-${stack}"
+    local template="${dir}/${stack}.yaml"
+
+    echo "deploy ${stackname} (${stack}.yaml) ..."
+
+    aws --region "${AWS_DEFAULT_REGION}" \
+      cloudformation deploy \
+      --no-fail-on-empty-changeset \
+      --stack-name "$stackname" \
+      --template-file "${template}" \
+      --capabilities CAPABILITY_IAM \
+      --parameter-overrides \
+      Prefix="${RESOURCE_PREFIX}"
+  done
+  echo
+}
+
+delete_stack() {
+  [[ -z "$1" ]] && error "delete_stack: missing cmd: name"
+
+  for stack in "$@"; do
+    local stackname="${RESOURCE_PREFIX}-${stack}"
+
+    echo "delete stack: ${stackname} ..."
+    aws --region "${AWS_DEFAULT_REGION}" \
+      cloudformation delete-stack \
+      --stack-name "${stackname}"
+
+    aws --region "${AWS_DEFAULT_REGION}" \
+      cloudformation wait stack-delete-complete \
+      --stack-name "${stackname}"
+  done
+  echo
+}
+
+deploy_vpc() {
+  deploy_stack "infrastructure" "vpc"
+}
+
+deploy_ecs_cluster() {
+  deploy_stack "infrastructure" "ecs-cluster"
+}
+
+deploy_gateway() {
+  deploy_stack "service" "gateway"
+}
+
+deploy_blue() {
+  deploy_stack "service" "blue"
+}
+
+deploy_green() {
+  deploy_stack "service" "green"
+}
+
+deploy_mesh() {
+  deploy_stack "mesh" "mesh"
+}
+
+confirm_service_linked_role() {
+  if ! aws iam get-role --role-name AWSServiceRoleForAppMesh >/dev/null; then
+    echo "Error: no service linked role for App Mesh"
+    exit 1
+  fi
+}
+
+postdeploy() {
+  confirm_service_linked_role
+  print_endpoints "ecs-cluster"
+}
+
+meshify() {
+  deploy_stack "mesh" "mesh"
+  deploy_stack "mesh" "gateway"
+  deploy_stack "mesh" "blue"
+  deploy_stack "mesh" "green"
+}
+
+demo_app() {
+  deploy_vpc
+  deploy_ecs_cluster
+  deploy_gateway
+  deploy_blue
+
+  postdeploy
+}
+
+demo_appmesh() {
+  deploy_vpc
+  deploy_ecs_cluster
+  meshify
+
+  postdeploy
+}
+
+unmeshify() {
+  delete_stack "mesh"
+  deploy_gateway
+  deploy_blue
+  deploy_green
+}
+
+delete_all() {
+  delete_stack "mesh"
+  delete_stack "green"
+  delete_stack "blue"
+  delete_stack "gateway"
+  delete_stack "ecs-cluster"
+  delete_stack "vpc"
+}
+
+fetch() {
+  local base="$1"
+  local ep="$(cat ${DIR}/${base}.url 2>/dev/null)"
+  [[ ! -z "$ep" ]] || error "Error: try running this command first: '""${SCRIPT}"" url'"
+  curl "$ep"
+}
+
+get_color() {
+  fetch "color"
+}
+
+clear_color() {
+  fetch "color_clear"
+}
+
+main() {
+  [[ "$#" == "0" ]] && usage
+
+  local cmd=$1
+  shift
+
+  # commands that print something and exit
+  case $cmd in
+    help) help; exit ;;
+    url) print_endpoints "ecs-cluster"; exit ;;
+    color) get_color; exit ;;
+    clear) clear_color; exit ;;
+  esac
+
+  # commands that depend on the environment, so display info
+  info
+  case $cmd in
+    app) demo_app;;
+    appmesh) demo_appmesh ;;
+    url) print_endpoints "ecs-cluster" ;;
+
+    vpc) deploy_vpc ;;
+    ecs) deploy_ecs_cluster ;;
+
+    gateway) deploy_gateway ;;
+    blue) deploy_blue ;;
+    green) deploy_green ;;
+
+    mesh) deploy_mesh ;;
+    meshify) meshify ;;
+    unmeshify) unmeshify ;;
+
+    delete-stack) delete_stack "$@" ;;
+    delete-all) delete_all ;;
+
+    *) usage 1 ;;
+  esac
+}
+
+main "$@"

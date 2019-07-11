@@ -1,5 +1,6 @@
 ---
 Resources:
+
   Mesh:
     Type: AWS::AppMesh::Mesh
     Properties:
@@ -131,3 +132,5 @@ Resources:
               Weight: 50
             - VirtualNode: "colorteller-green-node"
               Weight: 50
+
+
