@@ -128,6 +128,10 @@ Resources:
               Value: !Sub "mesh/${Prefix}-mesh/virtualNode/colorgateway-node"
             - Name: "ENVOY_LOG_LEVEL"
               Value: "debug"
+            - Name: "ENABLE_ENVOY_XRAY_TRACING"
+              Value: 1
+            - Name: "ENABLE_ENVOY_STATS_TAGS"
+              Value: 1
         - Name: xray
           Image: "amazon/aws-xray-daemon"
           Essential: true

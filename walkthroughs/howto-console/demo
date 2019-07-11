@@ -96,9 +96,7 @@ deploy_stack() {
   for stack in "$@"; do
     local stackname="${RESOURCE_PREFIX}-${stack}"
     local template="${dir}/${stack}.yaml"
-
     echo "deploy ${stackname} (${stack}.yaml) ..."
-
     aws --region "${AWS_DEFAULT_REGION}" \
       cloudformation deploy \
       --no-fail-on-empty-changeset \
@@ -116,12 +114,10 @@ delete_stack() {
 
   for stack in "$@"; do
     local stackname="${RESOURCE_PREFIX}-${stack}"
-
     echo "delete stack: ${stackname} ..."
     aws --region "${AWS_DEFAULT_REGION}" \
       cloudformation delete-stack \
       --stack-name "${stackname}"
-
     aws --region "${AWS_DEFAULT_REGION}" \
       cloudformation wait stack-delete-complete \
       --stack-name "${stackname}"
@@ -268,3 +264,4 @@ main() {
 }
 
 main "$@"
+
