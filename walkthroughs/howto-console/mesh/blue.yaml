@@ -112,12 +112,12 @@ Resources:
           LogConfiguration:
             LogDriver: 'awslogs'
             Options:
-              awslogs-group: !Sub '${AWS::StackName}-log-group'
+              awslogs-group: !Sub '${Prefix}-log-group'
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: 'blue'
           Environment:
             - Name: 'APPMESH_VIRTUAL_NODE_NAME'
-              Value: !Sub 'mesh/${AWS::StackName}-mesh/virtualNode/colorteller-blue-node'
+              Value: !Sub 'mesh/${Prefix}-mesh/virtualNode/colorteller-blue-node'
             - Name: 'ENVOY_LOG_LEVEL'
               Value: 'debug'
 

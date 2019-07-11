@@ -1,10 +1,40 @@
 ---
 Parameters:
+
   Prefix:
     Type: String
     Description: Prefix name that joins all the stacks
 
 Resources:
+
+  BlueColorTellerService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster:
+        Fn::ImportValue:
+          !Sub '${Prefix}:Cluster'
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DesiredCount: 1
+      LaunchType: 'FARGATE'
+      ServiceRegistries:
+        - RegistryArn:
+            Fn::ImportValue:
+              !Sub "${Prefix}:ColorTellerServiceRegistryArn"
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - Fn::ImportValue:
+                !Sub "${Prefix}:SecurityGroup"
+          Subnets:
+            - Fn::ImportValue:
+                !Sub '${Prefix}-vpc:PrivateSubnet1'
+            - Fn::ImportValue:
+                !Sub '${Prefix}-vpc:PrivateSubnet2'
+      TaskDefinition: !Ref BlueColorTellerTaskDefinition
+
   BlueColorTellerTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
@@ -40,32 +70,4 @@ Resources:
               Value: "blue"
             - Name: "STAGE"
               Value: ""
-
-  BlueColorTellerService:
-    Type: AWS::ECS::Service
-    Properties:
-      Cluster:
-        Fn::ImportValue:
-          !Sub '${Prefix}:Cluster'
-      DeploymentConfiguration:
-        MaximumPercent: 200
-        MinimumHealthyPercent: 100
-      DesiredCount: 1
-      LaunchType: 'FARGATE'
-      ServiceRegistries:
-        - RegistryArn:
-            Fn::ImportValue:
-              !Sub "${Prefix}:ColorTellerServiceRegistryArn"
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: DISABLED
-          SecurityGroups:
-            - Fn::ImportValue:
-                !Sub "${Prefix}:SecurityGroup"
-          Subnets:
-            - Fn::ImportValue:
-                !Sub '${Prefix}-vpc:PrivateSubnet1'
-            - Fn::ImportValue:
-                !Sub '${Prefix}-vpc:PrivateSubnet2'
-      TaskDefinition: !Ref BlueColorTellerTaskDefinition
 

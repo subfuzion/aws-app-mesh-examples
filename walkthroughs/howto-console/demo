@@ -149,10 +149,6 @@ deploy_green() {
   deploy_stack "service" "green"
 }
 
-deploy_mesh() {
-  deploy_stack "mesh" "mesh"
-}
-
 confirm_service_linked_role() {
   if ! aws iam get-role --role-name AWSServiceRoleForAppMesh >/dev/null; then
     echo "Error: no service linked role for App Mesh"
@@ -160,16 +156,33 @@ confirm_service_linked_role() {
   fi
 }
 
-postdeploy() {
+deploy_mesh() {
   confirm_service_linked_role
+  deploy_stack "mesh" "mesh"
+}
+
+postdeploy() {
   print_endpoints "ecs-cluster"
 }
 
 meshify() {
+  confirm_service_linked_role
+  echo "deploy mesh and all mesh-enabled services ..."
   deploy_stack "mesh" "mesh"
-  deploy_stack "mesh" "gateway"
-  deploy_stack "mesh" "blue"
-  deploy_stack "mesh" "green"
+  delete_stack "gateway"; deploy_stack "mesh" "gateway"
+  delete_stack "blue"; deploy_stack "mesh" "blue"
+  delete_stack "green"; deploy_stack "mesh" "green"
+  postdeploy
+}
+
+unmeshify() {
+  confirm_service_linked_role
+  echo "remove mesh and any running mesh-enabled services ..."
+  delete_stack "mesh"
+  delete_stack "gateway"; deploy_gateway
+  delete_stack "blue"; deploy_blue
+  delete_stack "green"; deploy_green
+  postdeploy
 }
 
 demo_app() {
@@ -177,23 +190,15 @@ demo_app() {
   deploy_ecs_cluster
   deploy_gateway
   deploy_blue
-
   postdeploy
 }
 
 demo_appmesh() {
+  confirm_service_linked_role
   deploy_vpc
   deploy_ecs_cluster
   meshify
-
   postdeploy
-}
-
-unmeshify() {
-  delete_stack "mesh"
-  deploy_gateway
-  deploy_blue
-  deploy_green
 }
 
 delete_all() {
@@ -212,12 +217,15 @@ fetch() {
   curl "$ep"
 }
 
-get_color() {
-  fetch "color"
-}
-
 clear_color() {
   fetch "color_clear"
+}
+
+get_color() {
+  local n="${1:-1}"
+  for i in $(seq "$n"); do
+    fetch "color"
+  done
 }
 
 main() {
@@ -230,7 +238,7 @@ main() {
   case $cmd in
     help) help; exit ;;
     url) print_endpoints "ecs-cluster"; exit ;;
-    color) get_color; exit ;;
+    color) get_color "$1"; exit ;;
     clear) clear_color; exit ;;
   esac
 

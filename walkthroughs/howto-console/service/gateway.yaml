@@ -1,10 +1,46 @@
 ---
 Parameters:
+
   Prefix:
     Type: String
     Description: Prefix name that joins all the stacks
 
 Resources:
+
+  ColorGatewayService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster:
+        Fn::ImportValue:
+          !Sub '${Prefix}:Cluster'
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DesiredCount: 1
+      LaunchType: 'FARGATE'
+      ServiceRegistries:
+        - RegistryArn:
+            Fn::ImportValue:
+              !Sub "${Prefix}:ColorGatewayServiceRegistryArn"
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - Fn::ImportValue:
+                !Sub "${Prefix}:SecurityGroup"
+          Subnets:
+            - Fn::ImportValue:
+                !Sub '${Prefix}-vpc:PrivateSubnet1'
+            - Fn::ImportValue:
+                !Sub '${Prefix}-vpc:PrivateSubnet2'
+      TaskDefinition: !Ref ColorGatewayTaskDefinition
+      LoadBalancers:
+        - ContainerName: app
+          ContainerPort: 9080
+          TargetGroupArn:
+            Fn::ImportValue:
+              !Sub "${Prefix}:WebTargetGroup"
+
   ColorGatewayTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
@@ -42,40 +78,4 @@ Resources:
               Value: ""
             - Name: "STAGE"
               Value: ""
-
-  ColorGatewayService:
-    Type: AWS::ECS::Service
-    #    DependsOn:
-    #      - WebLoadBalancerRule
-    Properties:
-      Cluster:
-        Fn::ImportValue:
-          !Sub '${Prefix}:Cluster'
-      DeploymentConfiguration:
-        MaximumPercent: 200
-        MinimumHealthyPercent: 100
-      DesiredCount: 1
-      LaunchType: 'FARGATE'
-      ServiceRegistries:
-        - RegistryArn:
-            Fn::ImportValue:
-              !Sub "${Prefix}:ColorGatewayServiceRegistryArn"
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: DISABLED
-          SecurityGroups:
-            - Fn::ImportValue:
-                !Sub "${Prefix}:SecurityGroup"
-          Subnets:
-            - Fn::ImportValue:
-                !Sub '${Prefix}-vpc:PrivateSubnet1'
-            - Fn::ImportValue:
-                !Sub '${Prefix}-vpc:PrivateSubnet2'
-      TaskDefinition: !Ref ColorGatewayTaskDefinition
-      LoadBalancers:
-        - ContainerName: app
-          ContainerPort: 9080
-          TargetGroupArn:
-            Fn::ImportValue:
-              !Sub "${Prefix}:WebTargetGroup"
 
