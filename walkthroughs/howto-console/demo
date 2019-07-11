@@ -13,8 +13,8 @@ Commands:
   help           display this help
 
 [Demo]
-  app            deploy basic Color App demo (vpc, cluster, gateway, blue)
-  appmesh        deploy Color App demo with App Mesh (vpc, cluster, gateway, blue, green, mesh)
+  app            deploy full Color App stack (no mesh)
+  appmesh        deploy full Color App stack (mesh)
   url            print the public endpoints for the deployed app
   color          fetches a color from the deployed app
   clear          resets the color history for the deployed app
@@ -30,8 +30,8 @@ Commands:
 
 [Mesh]
   mesh           deploy mesh
-  meshify        deploy mesh and (re)deploy all services (mesh versions)
-  unmeshify      delete mesh and (re)deploy all services (non-mesh versions)
+  meshify        deploy mesh and deploy services (mesh-enabled task defs)
+  unmeshify      delete mesh and deploy all services (non-mesh task defs)
 
 [Cleanup]
   delete-stack   [STACKS...] delete specific stack(s)
@@ -163,7 +163,7 @@ postdeploy() {
 
 meshify() {
   confirm_service_linked_role
-  echo "deploy mesh and all mesh-enabled services ..."
+  echo "deploy mesh and deploy services (mesh-enabled task defs) ..."
   deploy_stack "mesh" "mesh"
   deploy_stack "mesh" "gateway"
   deploy_stack "mesh" "blue"
@@ -173,7 +173,7 @@ meshify() {
 
 unmeshify() {
   confirm_service_linked_role
-  echo "remove mesh and any running mesh-enabled services ..."
+  echo "delete mesh and deploy all services (non-mesh task defs) ..."
   delete_stack "mesh"
   deploy_gateway
   deploy_blue
@@ -182,6 +182,7 @@ unmeshify() {
 }
 
 demo_app() {
+  confirm_service_linked_role
   deploy_vpc
   deploy_ecs_cluster
   deploy_gateway
