@@ -55,45 +55,45 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      AvailabilityZone: !Select [ 0, !GetAZs "" ]
       CidrBlock: !Ref PublicSubnet1CIDR
       MapPublicIpOnLaunch: true
       Tags: 
         - Key: Name 
-          Value: !Sub '${AWS::StackName} Public Subnet (AZ1)'
+          Value: !Sub "${AWS::StackName} Public Subnet (AZ1)"
 
   PublicSubnet2: 
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      AvailabilityZone: !Select [ 1, !GetAZs "" ]
       CidrBlock: !Ref PublicSubnet2CIDR
       MapPublicIpOnLaunch: true
       Tags: 
         - Key: Name 
-          Value: !Sub '${AWS::StackName} Public Subnet (AZ2)'
+          Value: !Sub "${AWS::StackName} Public Subnet (AZ2)"
 
   PrivateSubnet1: 
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      AvailabilityZone: !Select [ 0, !GetAZs "" ]
       CidrBlock: !Ref PrivateSubnet1CIDR
       MapPublicIpOnLaunch: false
       Tags: 
         - Key: Name 
-          Value: !Sub '${AWS::StackName} Private Subnet (AZ1)'
+          Value: !Sub "${AWS::StackName} Private Subnet (AZ1)"
 
   PrivateSubnet2: 
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      AvailabilityZone: !Select [ 1, !GetAZs "" ]
       CidrBlock: !Ref PrivateSubnet2CIDR
       MapPublicIpOnLaunch: false
       Tags: 
         - Key: Name 
-          Value: !Sub '${AWS::StackName} Private Subnet (AZ2)'
+          Value: !Sub "${AWS::StackName} Private Subnet (AZ2)"
 
   NatGateway1EIP:
     Type: AWS::EC2::EIP
@@ -125,7 +125,7 @@ Resources:
       VpcId: !Ref VPC
       Tags: 
         - Key: Name 
-          Value: !Sub '${AWS::StackName} Public Routes'
+          Value: !Sub "${AWS::StackName} Public Routes"
 
   DefaultPublicRoute: 
     Type: AWS::EC2::Route
@@ -153,7 +153,7 @@ Resources:
       VpcId: !Ref VPC
       Tags: 
         - Key: Name 
-          Value: !Sub '${AWS::StackName} Private Routes (AZ1)'
+          Value: !Sub "${AWS::StackName} Private Routes (AZ1)"
 
   DefaultPrivateRoute1:
     Type: AWS::EC2::Route
@@ -174,7 +174,7 @@ Resources:
       VpcId: !Ref VPC
       Tags: 
         - Key: Name 
-          Value: !Sub '${AWS::StackName} Private Routes (AZ2)'
+          Value: !Sub "${AWS::StackName} Private Routes (AZ2)"
 
   DefaultPrivateRoute2:
     Type: AWS::EC2::Route
@@ -194,34 +194,34 @@ Outputs:
     Description: A reference to the created VPC
     Value: !Ref VPC
     Export: 
-      Name: !Sub '${AWS::StackName}:VPC'
+      Name: !Sub "${AWS::StackName}:VPC"
 
   PublicSubnet1:
     Description: A reference to the public subnet in the 1st Availability Zone
     Value: !Ref PublicSubnet1
     Export: 
-      Name: !Sub '${AWS::StackName}:PublicSubnet1'
+      Name: !Sub "${AWS::StackName}:PublicSubnet1"
 
   PublicSubnet2: 
     Description: A reference to the public subnet in the 2nd Availability Zone
     Value: !Ref PublicSubnet2
     Export: 
-      Name: !Sub '${AWS::StackName}:PublicSubnet2'
+      Name: !Sub "${AWS::StackName}:PublicSubnet2"
 
   PrivateSubnet1:
     Description: A reference to the private subnet in the 1st Availability Zone
     Value: !Ref PrivateSubnet1
     Export: 
-      Name: !Sub '${AWS::StackName}:PrivateSubnet1'
+      Name: !Sub "${AWS::StackName}:PrivateSubnet1"
 
   PrivateSubnet2: 
     Description: A reference to the private subnet in the 2nd Availability Zone
     Value: !Ref PrivateSubnet2
     Export: 
-      Name: !Sub '${AWS::StackName}:PrivateSubnet2'
+      Name: !Sub "${AWS::StackName}:PrivateSubnet2"
 
   VpcCIDR:
     Description: VPC CIDR
     Value: !Ref VpcCIDR
     Export:
-      Name: !Sub '${AWS::StackName}:VpcCIDR'
+      Name: !Sub "${AWS::StackName}:VpcCIDR"

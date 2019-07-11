@@ -169,9 +169,9 @@ meshify() {
   confirm_service_linked_role
   echo "deploy mesh and all mesh-enabled services ..."
   deploy_stack "mesh" "mesh"
-  delete_stack "gateway"; deploy_stack "mesh" "gateway"
-  delete_stack "blue"; deploy_stack "mesh" "blue"
-  delete_stack "green"; deploy_stack "mesh" "green"
+  deploy_stack "mesh" "gateway"
+  deploy_stack "mesh" "blue"
+  deploy_stack "mesh" "green"
   postdeploy
 }
 
@@ -179,9 +179,9 @@ unmeshify() {
   confirm_service_linked_role
   echo "remove mesh and any running mesh-enabled services ..."
   delete_stack "mesh"
-  delete_stack "gateway"; deploy_gateway
-  delete_stack "blue"; deploy_blue
-  delete_stack "green"; deploy_green
+  deploy_gateway
+  deploy_blue
+  deploy_green
   postdeploy
 }
 

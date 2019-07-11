@@ -12,12 +12,12 @@ Resources:
     Properties:
       Cluster:
         Fn::ImportValue:
-          !Sub '${Prefix}:Cluster'
+          !Sub "${Prefix}:Cluster"
       DeploymentConfiguration:
         MaximumPercent: 200
         MinimumHealthyPercent: 100
       DesiredCount: 1
-      LaunchType: 'FARGATE'
+      LaunchType: "FARGATE"
       ServiceRegistries:
         - RegistryArn:
             Fn::ImportValue:
@@ -30,18 +30,18 @@ Resources:
                 !Sub "${Prefix}:SecurityGroup"
           Subnets:
             - Fn::ImportValue:
-                !Sub '${Prefix}-vpc:PrivateSubnet1'
+                !Sub "${Prefix}-vpc:PrivateSubnet1"
             - Fn::ImportValue:
-                !Sub '${Prefix}-vpc:PrivateSubnet2'
+                !Sub "${Prefix}-vpc:PrivateSubnet2"
       TaskDefinition: !Ref GreenColorTellerTaskDefinition
 
   GreenColorTellerTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
       RequiresCompatibilities:
-        - 'FARGATE'
-      Family: 'green'
-      NetworkMode: 'awsvpc'
+        - "FARGATE"
+      Family: "green"
+      NetworkMode: "awsvpc"
       Cpu: 512
       Memory: 1024
       TaskRoleArn:
@@ -51,18 +51,12 @@ Resources:
         Fn::ImportValue:
           !Sub "${Prefix}:TaskExecutionIamRole"
       ContainerDefinitions:
-        - Name: 'app'
+        - Name: "app"
           Image: subfuzion/colorteller
           Essential: true
-          LogConfiguration:
-            LogDriver: 'awslogs'
-            Options:
-              awslogs-group: !Sub ${Prefix}-log-group
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: 'green'
           PortMappings:
             - ContainerPort: 9080
-              Protocol: 'tcp'
+              Protocol: "tcp"
           Environment:
             - Name: "SERVER_PORT"
               Value: "9080"
@@ -70,4 +64,24 @@ Resources:
               Value: "green"
             - Name: "STAGE"
               Value: ""
+          LogConfiguration:
+            LogDriver: "awslogs"
+            Options:
+              awslogs-group: !Sub "${Prefix}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: "green"
+        - Name: xray
+          Image: "amazon/aws-xray-daemon"
+          Essential: true
+          User: "1337"
+          PortMappings:
+            - ContainerPort: 2000
+              Protocol: "udp"
+          LogConfiguration:
+            LogDriver: "awslogs"
+            Options:
+              awslogs-group: !Sub "${Prefix}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: "green"
+
 

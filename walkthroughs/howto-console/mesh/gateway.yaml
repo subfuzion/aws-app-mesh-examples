@@ -12,12 +12,12 @@ Resources:
     Properties:
       Cluster:
         Fn::ImportValue:
-          !Sub '${Prefix}:Cluster'
+          !Sub "${Prefix}:Cluster"
       DeploymentConfiguration:
         MaximumPercent: 200
         MinimumHealthyPercent: 100
       DesiredCount: 1
-      LaunchType: 'FARGATE'
+      LaunchType: "FARGATE"
       ServiceRegistries:
         - RegistryArn:
             Fn::ImportValue:
@@ -30,9 +30,9 @@ Resources:
                 !Sub "${Prefix}:SecurityGroup"
           Subnets:
             - Fn::ImportValue:
-                !Sub '${Prefix}-vpc:PrivateSubnet1'
+                !Sub "${Prefix}-vpc:PrivateSubnet1"
             - Fn::ImportValue:
-                !Sub '${Prefix}-vpc:PrivateSubnet2'
+                !Sub "${Prefix}-vpc:PrivateSubnet2"
       TaskDefinition: !Ref ColorGatewayTaskDefinition
       LoadBalancers:
         - ContainerName: app
@@ -45,9 +45,9 @@ Resources:
     Type: AWS::ECS::TaskDefinition
     Properties:
       RequiresCompatibilities:
-        - 'FARGATE'
-      Family: 'colorgateway'
-      NetworkMode: 'awsvpc'
+        - "FARGATE"
+      Family: "colorgateway"
+      NetworkMode: "awsvpc"
       Cpu: 512
       Memory: 1024
       TaskRoleArn:
@@ -57,32 +57,26 @@ Resources:
         Fn::ImportValue:
           !Sub "${Prefix}:TaskExecutionIamRole"
       ProxyConfiguration:
-        Type: 'APPMESH'
-        ContainerName: 'envoy'
+        Type: "APPMESH"
+        ContainerName: "envoy"
         ProxyConfigurationProperties:
-          - Name: 'IgnoredUID'
-            Value: '1337'
-          - Name: 'ProxyIngressPort'
-            Value: '15000'
-          - Name: 'ProxyEgressPort'
-            Value: '15001'
-          - Name: 'AppPorts'
-            Value: '9080'
-          - Name: 'EgressIgnoredIPs'
-            Value: '169.254.170.2,169.254.169.254'
+          - Name: "IgnoredUID"
+            Value: "1337"
+          - Name: "ProxyIngressPort"
+            Value: "15000"
+          - Name: "ProxyEgressPort"
+            Value: "15001"
+          - Name: "AppPorts"
+            Value: "9080"
+          - Name: "EgressIgnoredIPs"
+            Value: "169.254.170.2,169.254.169.254"
       ContainerDefinitions:
-        - Name: 'app'
+        - Name: "app"
           Image: subfuzion/colorgateway
           Essential: true
-          LogConfiguration:
-            LogDriver: 'awslogs'
-            Options:
-              awslogs-group: !Sub '${Prefix}-log-group'
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: 'colorgateway'
           PortMappings:
             - ContainerPort: 9080
-              Protocol: 'tcp'
+              Protocol: "tcp"
           Environment:
             - Name: "SERVER_PORT"
               Value: "9080"
@@ -92,41 +86,60 @@ Resources:
               Value: ""
             - Name: "STAGE"
               Value: ""
+          LogConfiguration:
+            LogDriver: "awslogs"
+            Options:
+              awslogs-group: !Sub "${Prefix}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: "colorgateway"
           DependsOn:
             - ContainerName: "envoy"
               Condition: "HEALTHY"
         - Name: envoy
           Image: subfuzion/aws-appmesh-envoy:v1.9.1.0-prod
           Essential: true
-          User: '1337'
+          User: "1337"
           Ulimits:
             - Name: "nofile"
               HardLimit: 15000
               SoftLimit: 15000
           PortMappings:
             - ContainerPort: 9901
-              Protocol: 'tcp'
+              Protocol: "tcp"
             - ContainerPort: 15000
-              Protocol: 'tcp'
+              Protocol: "tcp"
             - ContainerPort: 15001
-              Protocol: 'tcp'
+              Protocol: "tcp"
           HealthCheck:
             Command:
-              - 'CMD-SHELL'
-              - 'curl -s http://localhost:9901/server_info | grep state | grep -q LIVE'
+              - "CMD-SHELL"
+              - "curl -s http://localhost:9901/server_info | grep state | grep -q LIVE"
             Interval: 5
             Timeout: 2
             Retries: 3
           LogConfiguration:
-            LogDriver: 'awslogs'
+            LogDriver: "awslogs"
             Options:
-              awslogs-group: !Sub '${Prefix}-log-group'
+              awslogs-group: !Sub "${Prefix}-log-group"
               awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: 'colorgateway'
+              awslogs-stream-prefix: "colorgateway"
           Environment:
-            - Name: 'APPMESH_VIRTUAL_NODE_NAME'
-              Value: !Sub 'mesh/${Prefix}-mesh/virtualNode/colorgateway-node'
-            - Name: 'ENVOY_LOG_LEVEL'
-              Value: 'debug'
+            - Name: "APPMESH_VIRTUAL_NODE_NAME"
+              Value: !Sub "mesh/${Prefix}-mesh/virtualNode/colorgateway-node"
+            - Name: "ENVOY_LOG_LEVEL"
+              Value: "debug"
+        - Name: xray
+          Image: "amazon/aws-xray-daemon"
+          Essential: true
+          User: "1337"
+          PortMappings:
+            - ContainerPort: 2000
+              Protocol: "udp"
+          LogConfiguration:
+            LogDriver: "awslogs"
+            Options:
+              awslogs-group: !Sub "${Prefix}-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: "colorgateway"
 
 

@@ -9,7 +9,7 @@ Resources:
   ColorTellerBlueNode:
     Type: AWS::AppMesh::VirtualNode
     DependsOn:
-    - Mesh
+      - Mesh
     Properties:
       MeshName: !Ref AWS::StackName
       VirtualNodeName: "colorteller-blue-node"
@@ -19,24 +19,24 @@ Resources:
             ServiceName: "colorteller"
             NamespaceName: !Sub "${AWS::StackName}.local"
             Attributes:
-            - Key: "ECS_TASK_DEFINITION_FAMILY"
-              Value: "blue"
+              - Key: "ECS_TASK_DEFINITION_FAMILY"
+                Value: "blue"
         Listeners:
-        - PortMapping:
-            Port: 9080
-            Protocol: http
-          HealthCheck:
-            Protocol: http
-            Path: "/ping"
-            HealthyThreshold: 2
-            UnhealthyThreshold: 2
-            TimeoutMillis: 2000
-            IntervalMillis: 5000
+          - PortMapping:
+              Port: 9080
+              Protocol: http
+            HealthCheck:
+              Protocol: http
+              Path: "/ping"
+              HealthyThreshold: 2
+              UnhealthyThreshold: 2
+              TimeoutMillis: 2000
+              IntervalMillis: 5000
 
   ColorTellerGreenNode:
     Type: AWS::AppMesh::VirtualNode
     DependsOn:
-    - Mesh
+      - Mesh
     Properties:
       MeshName: !Ref AWS::StackName
       VirtualNodeName: "colorteller-green-node"
@@ -46,24 +46,24 @@ Resources:
             ServiceName: "colorteller"
             NamespaceName: !Sub "${AWS::StackName}.local"
             Attributes:
-            - Key: "ECS_TASK_DEFINITION_FAMILY"
-              Value: "green"
+              - Key: "ECS_TASK_DEFINITION_FAMILY"
+                Value: "green"
         Listeners:
-        - PortMapping:
-            Port: 9080
-            Protocol: http
-          HealthCheck:
-            Protocol: http
-            Path: "/ping"
-            HealthyThreshold: 2
-            UnhealthyThreshold: 2
-            TimeoutMillis: 2000
-            IntervalMillis: 5000
-  
+          - PortMapping:
+              Port: 9080
+              Protocol: http
+            HealthCheck:
+              Protocol: http
+              Path: "/ping"
+              HealthyThreshold: 2
+              UnhealthyThreshold: 2
+              TimeoutMillis: 2000
+              IntervalMillis: 5000
+
   ColorGatewayNode:
     Type: AWS::AppMesh::VirtualNode
     DependsOn:
-    - ColorTellerService
+      - ColorTellerService
     Properties:
       MeshName: !Ref AWS::StackName
       VirtualNodeName: "colorgateway-node"
@@ -73,24 +73,24 @@ Resources:
             NamespaceName: !Sub "${AWS::StackName}.local"
             ServiceName: "colorgateway"
         Listeners:
-        - PortMapping:
-            Port: 9080
-            Protocol: http
-          HealthCheck:
-            Protocol: http
-            Path: "/ping"
-            HealthyThreshold: 2
-            UnhealthyThreshold: 2
-            TimeoutMillis: 2000
-            IntervalMillis: 5000
+          - PortMapping:
+              Port: 9080
+              Protocol: http
+            HealthCheck:
+              Protocol: http
+              Path: "/ping"
+              HealthyThreshold: 2
+              UnhealthyThreshold: 2
+              TimeoutMillis: 2000
+              IntervalMillis: 5000
         Backends:
-        - VirtualService:
-            VirtualServiceName: !Sub "colorteller.${AWS::StackName}.local"
+          - VirtualService:
+              VirtualServiceName: !Sub "colorteller.${AWS::StackName}.local"
 
   ColorTellerService:
     Type: AWS::AppMesh::VirtualService
     DependsOn:
-    - ColorTellerRouter
+      - ColorTellerRouter
     Properties:
       MeshName: !Ref AWS::StackName
       VirtualServiceName: !Sub "colorteller.${AWS::StackName}.local"
@@ -102,22 +102,22 @@ Resources:
   ColorTellerRouter:
     Type: AWS::AppMesh::VirtualRouter
     DependsOn:
-    - Mesh
+      - Mesh
     Properties:
       MeshName: !Ref AWS::StackName
       VirtualRouterName: "colorteller-virtual-router"
       Spec:
         Listeners:
-        - PortMapping:
-            Port: 9080
-            Protocol: http
+          - PortMapping:
+              Port: 9080
+              Protocol: http
 
   ColorTellerRoute:
     Type: AWS::AppMesh::Route
     DependsOn:
-    - ColorTellerRouter
-    - ColorTellerBlueNode
-    - ColorTellerGreenNode
+      - ColorTellerRouter
+      - ColorTellerBlueNode
+      - ColorTellerGreenNode
     Properties:
       MeshName: !Ref AWS::StackName
       VirtualRouterName: "colorteller-virtual-router"
@@ -128,9 +128,9 @@ Resources:
             Prefix: "/"
           Action:
             WeightedTargets:
-            - VirtualNode: "colorteller-blue-node"
-              Weight: 50
-            - VirtualNode: "colorteller-green-node"
-              Weight: 50
+              - VirtualNode: "colorteller-blue-node"
+                Weight: 50
+              - VirtualNode: "colorteller-green-node"
+                Weight: 50
 
 

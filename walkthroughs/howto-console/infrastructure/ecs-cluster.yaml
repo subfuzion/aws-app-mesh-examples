@@ -9,22 +9,22 @@ Resources:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: !Ref AWS::StackName
-      
+
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
-    Properties: 
+    Properties:
       GroupDescription: "Security group for the instances"
       VpcId:
-        Fn::ImportValue: !Sub '${Prefix}-vpc:VPC'
+        Fn::ImportValue: !Sub "${Prefix}-vpc:VPC"
       SecurityGroupIngress:
-      - CidrIp:
-          Fn::ImportValue: !Sub '${Prefix}-vpc:VpcCIDR'
-        IpProtocol: -1
-        
+        - CidrIp:
+            Fn::ImportValue: !Sub "${Prefix}-vpc:VpcCIDR"
+          IpProtocol: -1
+
   LogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub '${Prefix}-log-group'
+      LogGroupName: !Sub "${Prefix}-log-group"
       RetentionInDays: 5
 
   TaskIamRole:
@@ -40,7 +40,7 @@ Resources:
             }]
         }
       ManagedPolicyArns:
-      - arn:aws:iam::aws:policy/CloudWatchFullAccess
+        - arn:aws:iam::aws:policy/CloudWatchFullAccess
 
   TaskExecutionIamRole:
     Type: AWS::IAM::Role
@@ -55,13 +55,13 @@ Resources:
             }]
         }
       ManagedPolicyArns:
-      - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
-      - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
 
   CloudMapNamespace:
     Type: AWS::ServiceDiscovery::PrivateDnsNamespace
     Properties:
-      Name: !Sub '${Prefix}-mesh.local'
+      Name: !Sub "${Prefix}-mesh.local"
       Vpc:
         Fn::ImportValue:
           !Sub "${Prefix}-vpc:VPC"
@@ -69,9 +69,9 @@ Resources:
   ColorTellerServiceRegistry:
     Type: AWS::ServiceDiscovery::Service
     Properties:
-      Name: 'colorteller'
+      Name: "colorteller"
       DnsConfig:
-        NamespaceId: !GetAtt 'CloudMapNamespace.Id'
+        NamespaceId: !GetAtt "CloudMapNamespace.Id"
         DnsRecords:
           - Type: A
             TTL: 10
@@ -81,9 +81,9 @@ Resources:
   ColorGatewayServiceRegistry:
     Type: AWS::ServiceDiscovery::Service
     Properties:
-      Name: 'colorgateway'
+      Name: "colorgateway"
       DnsConfig:
-        NamespaceId: !GetAtt 'CloudMapNamespace.Id'
+        NamespaceId: !GetAtt "CloudMapNamespace.Id"
         DnsRecords:
           - Type: A
             TTL: 10
@@ -93,13 +93,13 @@ Resources:
   PublicLoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: 'Access to the public facing load balancer'
+      GroupDescription: "Access to the public facing load balancer"
       VpcId:
         Fn::ImportValue:
           !Sub "${Prefix}-vpc:VPC"
       SecurityGroupIngress:
-      - CidrIp: 0.0.0.0/0
-        IpProtocol: -1
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: -1
 
   PublicLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -107,43 +107,43 @@ Resources:
       Scheme: internet-facing
       LoadBalancerAttributes:
         - Key: idle_timeout.timeout_seconds
-          Value: '30'
+          Value: "30"
       Subnets:
-      - Fn::ImportValue:
-          !Sub '${Prefix}-vpc:PublicSubnet1'
-      - Fn::ImportValue:
-          !Sub '${Prefix}-vpc:PublicSubnet2'
+        - Fn::ImportValue:
+            !Sub "${Prefix}-vpc:PublicSubnet1"
+        - Fn::ImportValue:
+            !Sub "${Prefix}-vpc:PublicSubnet2"
       SecurityGroups:
-      - !Ref PublicLoadBalancerSecurityGroup
+        - !Ref PublicLoadBalancerSecurityGroup
 
   WebTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       HealthCheckIntervalSeconds: 6
-      HealthCheckPath: '/ping'
+      HealthCheckPath: "/ping"
       HealthCheckProtocol: HTTP
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
       TargetType: ip
-      Name: !Sub '${Prefix}-webtarget'
+      Name: !Sub "${Prefix}-webtarget"
       Port: 80
       Protocol: HTTP
       UnhealthyThresholdCount: 2
       TargetGroupAttributes:
-      - Key: deregistration_delay.timeout_seconds
-        Value: 30
+        - Key: deregistration_delay.timeout_seconds
+          Value: 30
       VpcId:
         Fn::ImportValue:
           !Sub "${Prefix}-vpc:VPC"
-  
+
   PublicLoadBalancerListener:
     DependsOn:
-    - PublicLoadBalancer
+      - PublicLoadBalancer
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
-      - TargetGroupArn: !Ref WebTargetGroup
-        Type: 'forward'
+        - TargetGroupArn: !Ref WebTargetGroup
+          Type: "forward"
       LoadBalancerArn: !Ref PublicLoadBalancer
       Port: 80
       Protocol: HTTP
@@ -152,61 +152,61 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
       Actions:
-      - TargetGroupArn: !Ref WebTargetGroup
-        Type: 'forward'
+        - TargetGroupArn: !Ref WebTargetGroup
+          Type: "forward"
       Conditions:
-      - Field: path-pattern
-        Values:
-        - '*'
+        - Field: path-pattern
+          Values:
+            - "*"
       ListenerArn: !Ref PublicLoadBalancerListener
       Priority: 1
 
 Outputs:
   PublicURL:
-    Description: 'Public URL for the Color App'
-    Value: !Join ['', ['http://', !GetAtt 'PublicLoadBalancer.DNSName']]
+    Description: "Public URL for the Color App"
+    Value: !Join ["", ["http://", !GetAtt "PublicLoadBalancer.DNSName"]]
     Export:
-      Name: !Sub '${Prefix}:PublicURL'
+      Name: !Sub "${Prefix}:PublicURL"
 
   Cluster:
-    Description: 'Cluster'
+    Description: "Cluster"
     Value: !Ref Cluster
     Export:
-      Name: !Sub '${Prefix}:Cluster'
+      Name: !Sub "${Prefix}:Cluster"
 
   SecurityGroup:
-    Description: 'SecurityGroup'
+    Description: "SecurityGroup"
     Value: !Ref SecurityGroup
     Export:
-      Name: !Sub '${Prefix}:SecurityGroup'
+      Name: !Sub "${Prefix}:SecurityGroup"
 
   TaskExecutionIamRole:
-    Description: 'TaskExecutionIamRole'
+    Description: "TaskExecutionIamRole"
     Value: !Ref TaskExecutionIamRole
     Export:
-      Name: !Sub '${Prefix}:TaskExecutionIamRole'
+      Name: !Sub "${Prefix}:TaskExecutionIamRole"
 
   TaskIamRole:
-    Description: 'TaskIamRole'
+    Description: "TaskIamRole"
     Value: !Ref TaskIamRole
     Export:
-      Name: !Sub '${Prefix}:TaskIamRole'
+      Name: !Sub "${Prefix}:TaskIamRole"
 
   WebTargetGroup:
-    Description: 'WebTargetGroup'
+    Description: "WebTargetGroup"
     Value: !Ref WebTargetGroup
     Export:
-      Name: !Sub '${Prefix}:WebTargetGroup'
+      Name: !Sub "${Prefix}:WebTargetGroup"
 
   ColorGatewayServiceRegistryArn:
-    Description: 'ColorGatewayServiceRegistryArn'
+    Description: "ColorGatewayServiceRegistryArn"
     Value: !GetAtt ColorGatewayServiceRegistry.Arn
     Export:
-      Name: !Sub '${Prefix}:ColorGatewayServiceRegistryArn'
+      Name: !Sub "${Prefix}:ColorGatewayServiceRegistryArn"
 
   ColorTellerServiceRegistryArn:
-    Description: 'ColorTellerServiceRegistryArn'
+    Description: "ColorTellerServiceRegistryArn"
     Value: !GetAtt ColorTellerServiceRegistry.Arn
     Export:
-      Name: !Sub '${Prefix}:ColorTellerServiceRegistryArn'
+      Name: !Sub "${Prefix}:ColorTellerServiceRegistryArn"
 
