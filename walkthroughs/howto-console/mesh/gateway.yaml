@@ -145,5 +145,8 @@ Resources:
               awslogs-group: !Sub "${Prefix}-log-group"
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: "colorgateway"
+          DependsOn:
+            - ContainerName: "envoy"
+              Condition: "HEALTHY"
 
 

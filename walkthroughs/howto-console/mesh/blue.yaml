@@ -137,4 +137,7 @@ Resources:
               awslogs-group: !Sub "${Prefix}-log-group"
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: "blue"
+          DependsOn:
+            - ContainerName: "envoy"
+              Condition: "HEALTHY"
 

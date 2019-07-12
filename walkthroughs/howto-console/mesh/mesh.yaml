@@ -70,8 +70,8 @@ Resources:
       Spec:
         ServiceDiscovery:
           AWSCloudMap:
-            NamespaceName: !Sub "${AWS::StackName}.local"
             ServiceName: "colorgateway"
+            NamespaceName: !Sub "${AWS::StackName}.local"
         Listeners:
           - PortMapping:
               Port: 9080

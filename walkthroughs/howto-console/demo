@@ -84,6 +84,11 @@ print_endpoints() {
   echo "${DIR}/color.url"
   echo "${DIR}/color_clear.url"
   echo
+
+  echo "You can run the following commands:"
+  echo "'""${SCRIPT}"" color [COUNT(=1)]'  fetch a color COUNT times"
+  echo "'""${SCRIPT}"" clear'              reset the color histogram"
+  echo
 }
 
 deploy_stack() {
