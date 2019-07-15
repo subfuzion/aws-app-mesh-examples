@@ -12,5 +12,6 @@ fi
 docker build -t $COLOR_TELLER_IMAGE .
 
 # push
-$(aws ecr get-login --no-include-email --region $AWS_DEFAULT_REGION --profile $AWS_PROFILE)
+$(aws ecr get-login --no-include-email)
 docker push $COLOR_TELLER_IMAGE
+
