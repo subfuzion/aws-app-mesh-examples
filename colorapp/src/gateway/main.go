@@ -51,6 +51,11 @@ func getColorTellerEndpoint() (string, error) {
 	return colorTellerEndpoint, nil
 }
 
+func xrayEnabled() bool {
+	enabled := os.Getenv("ENABLE_ENVOY_XRAY_TRACING")
+	return enabled == "1"
+}
+
 type colorHandler struct{}
 
 func (h *colorHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -123,7 +128,14 @@ func getColorFromColorTeller(request *http.Request) (string, error) {
 		return "-n/a-", err
 	}
 
-	client := xray.Client(&http.Client{})
+	var client *http.Client
+
+	if xrayEnabled() {
+		client = xray.Client(&http.Client{})
+	} else {
+		client = &http.Client{}
+	}
+
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s", colorTellerEndpoint), nil)
 	if err != nil {
 		return "-n/a-", err
@@ -216,11 +228,24 @@ func main() {
 	log.Println("Using color-teller at " + colorTellerEndpoint)
 	log.Println("Using tcp-echo at " + tcpEchoEndpoint)
 
-	xraySegmentNamer := xray.NewFixedSegmentNamer(fmt.Sprintf("%s-gateway", getStage()))
+	handlers := map[string]http.Handler {
+		"/color": &colorHandler{},
+		"/color/clear": &clearColorStatsHandler{},
+		"/tcpecho": &tcpEchoHandler{},
+		"/ping": &pingHandler{},
+	}
 
-	http.Handle("/color", xray.Handler(xraySegmentNamer, &colorHandler{}))
-	http.Handle("/color/clear", xray.Handler(xraySegmentNamer, &clearColorStatsHandler{}))
-	http.Handle("/tcpecho", xray.Handler(xraySegmentNamer, &tcpEchoHandler{}))
-	http.Handle("/ping", xray.Handler(xraySegmentNamer, &pingHandler{}))
+	if xrayEnabled() {
+		log.Println("xray tracing enabled")
+		xraySegmentNamer := xray.NewFixedSegmentNamer(fmt.Sprintf("%s-gateway", getStage()))
+		for route, handler := range handlers {
+			handlers[route] = xray.Handler(xraySegmentNamer, handler)
+		}
+	}
+
+	for route, handler := range handlers {
+		http.Handle(route, handler)
+	}
+
 	log.Fatal(http.ListenAndServe(":"+getServerPort(), nil))
 }

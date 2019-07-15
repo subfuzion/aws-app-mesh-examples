@@ -40,6 +40,11 @@ func getStage() string {
 	return defaultStage
 }
 
+func xrayEnabled() bool {
+	enabled := os.Getenv("ENABLE_ENVOY_XRAY_TRACING")
+	return enabled == "1"
+}
+
 type colorHandler struct{}
 func (h *colorHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	log.Println("color requested, responding with", getColor())
@@ -53,9 +58,24 @@ func (h *pingHandler) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 }
 
 func main() {
-	log.Println("starting server, listening on port " + getServerPort())
-	xraySegmentNamer := xray.NewFixedSegmentNamer(fmt.Sprintf("%s-colorteller-%s", getStage(), getColor()))
-	http.Handle("/", xray.Handler(xraySegmentNamer, &colorHandler{}))
-	http.Handle("/ping", xray.Handler(xraySegmentNamer, &pingHandler{}))
-	http.ListenAndServe(":"+getServerPort(), nil)
+	log.Printf("starting server (%s), listening on port %s", getColor(), getServerPort())
+
+	handlers := map[string]http.Handler {
+		"/color": &colorHandler{},
+		"/ping": &pingHandler{},
+	}
+
+	if xrayEnabled() {
+		log.Println("xray tracing enabled")
+		xraySegmentNamer := xray.NewFixedSegmentNamer(fmt.Sprintf("%s-colorteller-%s", getStage(), getColor()))
+		for route, handler := range handlers {
+			handlers[route] = xray.Handler(xraySegmentNamer, handler)
+		}
+	}
+
+	for route, handler := range handlers {
+		http.Handle(route, handler)
+	}
+
+	log.Fatal(http.ListenAndServe(":"+getServerPort(), nil))
 }
