@@ -6,7 +6,7 @@ The following end-to-end walkthroughs show you AWS App Mesh in action, across di
 
 The following are part of an orientation series that build on the Color App.
 
-1. [ECS](../examples/apps/colorapp/)
+1. [ECS](../colorapp/)
 2. [Fargate](./fargate/)
 3. Coming next: EC2 ([pull request](https://github.com/aws/aws-app-mesh-examples/pull/102))
 

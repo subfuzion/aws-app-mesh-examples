@@ -35,12 +35,12 @@ Once you have deployed the Color App (see #prerequisites), configure the app so 
 
 Log into the App Mesh console and drill down into "Virtual routers" for the mesh. Configure the HTTP route to send 100% of traffic to the `colorteller-blue` virtual node.
 
-![](../../examples/apps/colorapp/img/appmesh-colorteller-route-1.png)
+![](../../colorapp/img/appmesh-colorteller-route-1.png)
 <p align="center"><b><i>Figure 4.</i></b> Routes in the App Mesh console.</p>
 
 Test the service and confirm in X-Ray that the traffic flows through the `colorteller-blue` as expected with no errors.
 
-![](../../examples/apps/colorapp/img/appmesh-xray-tracing-1.png)
+![](../../colorapp/img/appmesh-xray-tracing-1.png)
 <p align="center"><b><i>Figure 5.</i></b> Tracing the colorgateway virtual node.</p>
 
 ### Deploy the new colorteller to Fargate
@@ -215,7 +215,7 @@ In this walkthrough, we rolled out an update from version 1 (blue) of our colort
 
 
 [A/B testing]: https://en.wikipedia.org/wiki/A/B_testing
-[previous article]: ../../examples/apps/colorapp/README.md
+[previous article]: ../../colorapp/README.md
 [AWS App Mesh Documentation]: https://aws.amazon.com/app-mesh/getting-started/
 [AWS App Mesh]: https://aws.amazon.com/app-mesh/
 [AWS CLI]: https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html
@@ -227,5 +227,5 @@ In this walkthrough, we rolled out an update from version 1 (blue) of our colort
 [Fargate]: https://aws.amazon.com/fargate/
 [repo]: https://github.com/aws/aws-app-mesh-examples
 [Sidecar Pattern]: https://www.oreilly.com/library/view/designing-distributed-systems/9781491983638/ch02.html
-[walkthrough]: ../../examples/apps/colorapp/README.md
+[walkthrough]: ../../colorapp/README.md
 [walkthrough prerequisites]: https://medium.com/containers-on-aws/aws-app-mesh-walkthrough-deploy-the-color-app-on-amazon-ecs-de3452846e9d#42cf
